@@ -70,7 +70,54 @@ class DeepSeekClient:
             wire["tool_call_id"] = m.tool_call_id
         return wire        
 
+def chat(self, messages: list[Message], tools: list[Tool] | None = None) -> Message:
+    payload: dict[str, Any] = {
+        "model": self.MODEL,
+        "messages": [self._wire_message(m) for m in messages],
+    }
+    if tools:
+        payload["tools"] = [
+            {
+                "type": "function",
+                "function": {
+                    "name": tool.name,
+                    "description" : tool.description,
+                    "parameters": tool.parameters,
+                },
+            }
+            for tool in tools
+        ]
+        with httpx.Client(timeout=60) as client:
+            response = client.post(
+                f"{self.BASE_URL}/chat/completions",
+                headers={
+                    "Authorization": f"Bearer {self.api_key}",
+                    "Content-Type": "application/json",
+                },
+                json = payload,
+            )
+            response.raise_for_status()
+            data = response.json()
 
+        choice = data["choices"][0]
+        raw_message = choice["message"]
+        tool_calls: list[ToolCall] = []
+        for raw_call in raw_message.get("tool_calls") or []:
+            tool_calls.append(
+                ToolCall(
+                    id=raw_call["id"],
+                    name=raw_call["function"]["name"],
+                    arguments=raw_call["function"]["arguments"],
+                )
+            )
+        return Message(
+            role="assistant",
+            content=raw_message.get("content"),
+            reasoning_content=raw_message.get("reasoning_content"),
+            tool_calls=tuple(tool_calls),
+        )
+
+               
 
 
 
