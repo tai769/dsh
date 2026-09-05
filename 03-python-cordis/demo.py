@@ -70,7 +70,7 @@ def main() -> None:
     ctx.emit("ping", "第二次广播")
     print("  （上面没有收到消息 = 监听器随插件卸载自动解绑）")
 
-
+  
 
 if __name__ == "__main__":
     main()
