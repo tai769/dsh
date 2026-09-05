@@ -265,3 +265,17 @@ class Context:
             return listener(*inner_args, deeper)
         
         return dispatch(0, *call_args)
+
+
+    # ------------------------------------------------------------------
+    # 副作用入口（第 03 章相同）
+    # ------------------------------------------------------------------
+
+    def effect(self, fn: Callable[[], Disposer | None]) -> Disposer:
+        raw_disposer = fn()
+        disposer = _once(raw_disposer) if raw_disposer is not None else None
+        root = self._root_context()
+        owner = self._owner or root._current
+        if disposer is not None and owner is not None:
+            owner.collect(disposer)
+        return disposer if disposer is not None else (lambda: None)
