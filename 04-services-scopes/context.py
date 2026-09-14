@@ -69,13 +69,36 @@ class PluginHandle:
 
     def _recheck(self) -> None:
         """重算依赖签名（epoch）。签名变化才动作，避免重复启动。"""
-        if self.state == "dosposed":
+        if self.state == "disposed":
             return
 
-    #  - resolved：保存找到的服务对象，供插件实际使用。
-    #  - tokens：记录服务的身份和版本，用来判断依赖有没有变化。        
+        # resolved：保存找到的服务对象，供插件实际使用。
+        # tokens：记录服务的身份和版本，用来判断依赖有没有变化。
         resolved: dict[str, object] = {}
         tokens: list[str] = []
+        for name in self.inject:
+            impl = self._ctx._services.get(name)
+            if impl is not None:
+                resolved[name] = impl[0]
+                tokens.append(f"{name}={impl[1]}:{impl[2]}")
+            else:
+                tokens.append(f"{name}=-")
+        epoch = ",".join(tokens)
+        if epoch == self._epoch:
+            return
+        self._epoch = epoch
+
+        was_active = self.state == "active"
+        if was_active:
+            self._unload()  # 依赖提供者换了 → 先卸载旧状态
+
+        missing = any(name not in resolved for name in self.inject)
+        if missing:
+            self.state = "pending"
+        else:
+            self._store = resolved
+            self._run()
+
 
     # ------------------------------------------------------------------
     # 状态机（第 03 章相同，卸载时顺带清空依赖快照）
@@ -198,7 +221,7 @@ class Context:
 
     def _notify(self) -> None:
         """遍历全部句柄重算依赖（官方 reflect.notify 的教学简化版）。"""
-        for handle in list(self._root_context._handles):
+        for handle in list(self._root_context()._handles):
             handle._recheck()
     # ------------------------------------------------------------------
     # 严格访问：读服务必须先声明 inject
@@ -258,7 +281,7 @@ class Context:
         def dispatch(index: int, *inner_args:Any) -> Any:
             if index >= len(listeners):
                 return next_fn(*inner_args)
-            listener = listener[index]
+            listener = listeners[index]
 
             def deeper(*new_args:Any) -> Any:
                 return dispatch(index+1, *(new_args if new_args else inner_args))

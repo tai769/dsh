@@ -1,13 +1,13 @@
 """第 04 章 demo：四个魔法时刻。
 
 运行（无需 API，纯本地）：
-    uv run python chapters/04-services-scopes/src/demo.py
+    python 04-services-scopes/demo.py
 
 对照 README 观察：
 1. 服务后到自动启动（agent 等 tools 等到自动醒来）
 2. 提供者被卸载 → 依赖方自动卸载
 3. 读服务必须 inject（严格访问报错）
-4. waterfall 瀑布：不碰核心代码，给所有工具加超时日志
+4. waterfall 瀑布：不碰核心代码，给工具加执行日志
 """
 
 from __future__ import annotations
@@ -43,6 +43,7 @@ def main() -> None:
     ctx = Context()
     print("=== 时刻 1：服务后到，插件自动醒来 ===")
     ctx.plugin(llm_provider)
+    agent_handle = ctx.plugin(agent)
     print(f"  [agent] 当前状态: {agent_handle.state}   ← 依赖不齐，安静等待")
 
     tools_handle = ctx.plugin(tools_provider)
@@ -86,3 +87,14 @@ def main() -> None:
 
         c.on("tools/execute", wrap)
     ctx.plugin(timeout_policy)
+    result = ctx.waterfall(
+        "tools/execute",
+        {"name": "calculator"},
+        lambda execution: str(1 + 1),
+    )
+    print(f"  工具结果: {result}")
+
+
+
+if __name__ == "__main__":
+    main()
