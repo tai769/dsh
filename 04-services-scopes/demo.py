@@ -78,21 +78,22 @@ def main() -> None:
 
     print("=== 时刻 4：waterfall 瀑布 ===")
 
-    def timeout_policy(c : Context, _config: object) -> None:
+    def logging_policy(c: Context, _config: object) -> None:
         def wrap(exec_: dict[str, str], next_: Callable[[], str]) -> str:
-            print(f"  [timeout-policy] 开始执行工具 {exec_['name']}")
+            print(f"  [logging-policy] 开始执行工具 {exec_['name']}")
             result = next_()  # 放行进入内层，返回值沿链回传
-            print(f"  [timeout-policy] 工具 {exec_['name']} 完成")
+            print(f"  [logging-policy] 工具 {exec_['name']} 完成")
             return result
 
         c.on("tools/execute", wrap)
-    ctx.plugin(timeout_policy)
-    result = ctx.waterfall(
-        "tools/execute",
-        {"name": "calculator"},
-        lambda execution: str(1 + 1),
-    )
-    print(f"  工具结果: {result}")
+    ctx.plugin(logging_policy)
+
+    def core_executor(exec_: dict[str, str]) -> str:
+        print(f"  [core] 真正执行 {exec_['name']}……")
+        return "计算结果: 42"
+
+    result = ctx.waterfall("tools/execute", {"name": "calculator"}, core_executor)
+    print(f"  最终结果: {result}")
 
 
 

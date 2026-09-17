@@ -69,7 +69,7 @@ class PluginHandle:
 
     def _recheck(self) -> None:
         """重算依赖签名（epoch）。签名变化才动作，避免重复启动。"""
-        if self.state == "disposed":
+        if self.state in {"disposed", "failed"}:
             return
 
         # resolved：保存找到的服务对象，供插件实际使用。
@@ -201,7 +201,6 @@ class Context:
         provider_uid  = owner.uid if owner is not None else 0
         registration = (value, provider_uid, root._version)
         root._services[name] = registration
-        root._notify()
         
         def unregister_service() -> None:
             if root._services.get(name) is registration:
@@ -212,6 +211,11 @@ class Context:
 
         if owner is not None:
             owner.collect(unregister)
+        try:
+            root._notify()
+        except Exception:
+            unregister()
+            raise
         return unregister
 
     def get(self, name:str) -> object | None:

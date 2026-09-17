@@ -1,26 +1,43 @@
-import os
-from  pathlib  import Path
+"""第 02 章 demo：运行一次“模型 → 工具 → 模型”往返。
 
-from dotenv import dotenv_values
+在项目根目录运行：
+    .venv/bin/python 02-tool-calling/demo.py
+"""
+
+from __future__ import annotations
+
+from agent import run_agent
+from calculator import calculator
+from client import DeepSeekClient, Message
 
 
-from dataclasses import dataclass
+def print_history(history: list[Message]) -> None:
+    """打印完整对话历史，观察工具请求和结果如何回灌。"""
+    for message in history:
+        if message.role == "assistant" and message.tool_calls:
+            calls = ", ".join(
+                f"{call.name}({call.arguments})" for call in message.tool_calls
+            )
+            print(f"\n[assistant → 请求工具] {calls}")
+        elif message.role == "tool":
+            print(f"\n[tool → 结果 #{message.tool_call_id}] {message.content}")
+        else:
+            print(f"\n[{message.role}]\n{message.content}")
 
-def load_api_key() -> str:
-    from_env = os.getenv("DEEPSEEK_API_KEY")
-    if from_env:
-        return from_env
 
-    env_path = Path(__file__).resolve().parents[3] / ".env"
-    from_file = dotenv_values(env_path).get("DEEPSEEK_API_KEY")
-    if from_file:
-        return from_file
-    raise RuntimeError("找不到 DEEPSEEK_API_KEY：请参考 .env.example 创建 .env")
+def main() -> None:
+    client = DeepSeekClient()
+    history = run_agent(
+        client,
+        tools=[calculator],
+        system_prompt="你是一个数学助手。遇到算式时先调用 calculator 工具计算，"
+        "再基于计算结果回答。",
+        user_prompt="1+2*3 等于几？",
+        max_steps=10,
+    )
+    print("=== 完整对话历史 ===")
+    print_history(history)
 
-@dataclass(frozen=True)
-class Message:
-    role: str
-    content: str
 
-m = Message(role = "user", content="你好")
-
+if __name__ == "__main__":
+    main()

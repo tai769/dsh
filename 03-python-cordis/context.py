@@ -40,6 +40,7 @@ class PluginHandle:
     _next_uid = 1
     def __init__(self, ctx: "Context", plugin: PluginFn, config: Any):
         self.uid = PluginHandle._next_uid
+        PluginHandle._next_uid += 1
         self.name = getattr(plugin, "__name__", f"plugin#{self.uid}")
         self.config = config
         self.state = "pending"
@@ -93,8 +94,10 @@ class PluginHandle:
         """卸载：逆序执行全部清理函数（后注册的先清理）。"""
         if self.state == "disposed":
             return
-        self._dispose_all()
-        self.state = "disposed"
+        try:
+            self._dispose_all()
+        finally:
+            self.state = "disposed"
 
     def _dispose_all(self) -> None:
         disposers = list(reversed(self._disposers))
